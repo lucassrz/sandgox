@@ -130,7 +130,9 @@ func (g *Game) Update() error {
 		}
 	}
 
-	benchmarkCheck(g)
+	if benchmarkMode {
+		benchmarkCheck(g)
+	}
 
 	return nil
 }
@@ -138,7 +140,11 @@ func (g *Game) Update() error {
 func benchmarkCheck(game *Game) {
 	lineIsFull := false
 	for i := 0; i < gridSize; i++ {
-		lineIsFull = game.grid[gridSize-1][i].cellType != Air
+		if game.grid[gridSize-1][i].cellType == Air {
+			break
+		} else {
+			lineIsFull = true
+		}
 	}
 
 	if lineIsFull {
