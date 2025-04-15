@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"log"
 	"math/rand"
+
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -25,6 +26,7 @@ const (
 	Air CellType = iota
 	Sand
 	Water
+	Metal
 )
 
 type Cell struct {
@@ -150,6 +152,20 @@ func NewAirCell() Cell {
 			// Do nothing for air cells
 		},
 		cellType: Air,
+		color:    colors[rand.Intn(len(colors))], // yellow
+	}
+}
+func NewMetalCell() Cell {
+	colors := []color.Color{
+		color.RGBA{50, 50, 50, 255},
+		color.RGBA{60, 60, 60, 255},
+		color.RGBA{70, 70, 70, 255},
+	}
+	return Cell{
+		physic: func(x int, y int, g *Game) {
+			// Do nothing for air cells
+		},
+		cellType: Metal,
 		color:    colors[rand.Intn(len(colors))], // yellow
 	}
 }
