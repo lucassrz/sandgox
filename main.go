@@ -46,12 +46,41 @@ var timeBetweenUpdates = 0
 var benchmarkMode bool = false
 
 type Cell struct {
-	physic   func(x int, y int, g *Game)
 	cellType CellType
 	color    color.Color
-	liquid   bool
-	density  int
-	updated  bool
+}
+
+type CellData struct {
+	physic  func(x int, y int, g *Game)
+	liquid  bool
+	density int
+}
+
+var types = map[CellType]CellData{}
+
+func initTypes() {
+	types = map[CellType]CellData{
+		Sand: {
+			physic:  SandPhysic,
+			liquid:  false,
+			density: 10,
+		},
+		Water: {
+			physic:  WaterPhysic,
+			liquid:  true,
+			density: 9,
+		},
+		Air: {
+			physic:  NoPhysic,
+			liquid:  false,
+			density: 0,
+		},
+		Metal: {
+			physic:  NoPhysic,
+			liquid:  false,
+			density: 9999,
+		},
+	}
 }
 
 type resources struct {
@@ -86,17 +115,25 @@ func newResources() *resources {
 	}
 }
 
+type UpdateCell struct {
+	updateFunc func(x int, y int, g *Game)
+	PosX       int
+	PosY       int
+}
+
 func (g *Game) Update() error {
+
+	//var startTime = time.Now()
 	g.ui.Update()
 	// create a time variable
 
 	// convert to unix time in milliseconds
 	if drawn {
-		for y := gridSize - 1; y >= 0; y-- {
-			for x := 0; x < gridSize; x++ {
-				//if !g.grid[gridSize-y][x].updated {
-				g.grid[y][x].physic(x, y, g)
-				//}
+		for y, row := range g.grid {
+			for x, cell := range row {
+				if cell.cellType != Air {
+					types[cell.cellType].physic(x, y, g)
+				}
 			}
 		}
 	}
@@ -134,6 +171,7 @@ func (g *Game) Update() error {
 		benchmarkCheck(g)
 	}
 
+	//println("Time taken for update: ", time.Since(startTime).Milliseconds(), "ms")
 	return nil
 }
 
@@ -151,27 +189,34 @@ func benchmarkCheck(game *Game) {
 	}
 }
 
+type ImageToDraw struct {
+	image *ebiten.Image
+	op    *ebiten.DrawImageOptions
+}
+
 func (g *Game) Draw(screen *ebiten.Image) {
+	//var startTime = time.Now()
 	screen.Fill(color.Black)
 
+	// Pré-créer une image pour les cellules
+	rect := ebiten.NewImage(cellSize, cellSize)
+	op := &ebiten.DrawImageOptions{}
 	for y := 0; y < gridSize; y++ {
 		for x := 0; x < gridSize; x++ {
 			cell := g.grid[y][x]
-			cell.updated = false
 			if cell.cellType != Air {
-				rect := ebiten.NewImage(cellSize, cellSize)
-				rect.Fill(cell.color)
-				op := &ebiten.DrawImageOptions{}
+				rect.Fill(cell.color) // Remplir avec la couleur de la cellule
+				op.GeoM.Reset()       // Réinitialiser les transformations
 				op.GeoM.Translate(float64(x*cellSize), float64(y*cellSize))
 				screen.DrawImage(rect, op)
 			}
 		}
 	}
-
 	g.ui.Draw(screen)
 	ebiten.SetVsyncEnabled(false)
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()))
 	drawn = true
+	//println("Time taken for draw: ", time.Since(startTime).Milliseconds(), "ms")
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -184,10 +229,11 @@ func main() {
 	benchmarkMode = *benchmarkModeUnparsed
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 	ebiten.SetWindowTitle("sandgox")
+	initTypes()
 	game := &Game{
 		grid:             initGrid(),
 		selectedCellType: Sand,
-		brushSize:        1,
+		brushSize:        0,
 	}
 	game.setupUI()
 
@@ -322,30 +368,27 @@ func NewSandCell() Cell {
 		color.RGBA{150, 150, 0, 255},
 	}
 	return Cell{
-		physic: func(x int, y int, g *Game) {
-			if y+1 < gridSize {
-				cell := g.grid[y][x]
-				if canSwitchCell(cell, g.grid[y+1][x]) {
-					copyOfCell := g.grid[y+1][x]
-					g.grid[y+1][x] = cell
-					g.grid[y][x] = copyOfCell
-				} else if x-1 >= 0 && canSwitchCell(cell, g.grid[y+1][x-1]) {
-					copyOfCell := g.grid[y+1][x-1]
-
-					g.grid[y+1][x-1] = cell
-					g.grid[y][x] = copyOfCell
-				} else if x+1 < gridSize && canSwitchCell(cell, g.grid[y+1][x+1]) {
-					copyOfCell := g.grid[y+1][x+1]
-
-					g.grid[y+1][x+1] = cell
-					g.grid[y][x] = copyOfCell
-				}
-			}
-		},
 		cellType: Sand,
-		liquid:   false,
-		density:  10,
 		color:    colors[rand.Intn(len(colors))],
+	}
+}
+
+func SandPhysic(x int, y int, g *Game) {
+	if y+1 < gridSize {
+		cell := g.grid[y][x]
+		if canSwitchCell(cell, g.grid[y+1][x]) {
+			copyOfCell := g.grid[y+1][x]
+			g.grid[y+1][x] = cell
+			g.grid[y][x] = copyOfCell
+		} else if x-1 >= 0 && canSwitchCell(cell, g.grid[y+1][x-1]) {
+			copyOfCell := g.grid[y+1][x-1]
+			g.grid[y+1][x-1] = cell
+			g.grid[y][x] = copyOfCell
+		} else if x+1 < gridSize && canSwitchCell(cell, g.grid[y+1][x+1]) {
+			copyOfCell := g.grid[y+1][x+1]
+			g.grid[y+1][x+1] = cell
+			g.grid[y][x] = copyOfCell
+		}
 	}
 }
 
@@ -356,88 +399,83 @@ func NewWaterCell() Cell {
 		color.RGBA{0, 0, 150, 255},
 	}
 	return Cell{
-		physic: func(x int, y int, g *Game) {
-			if y+1 < gridSize {
-				cell := g.grid[y][x]
-				var actions = make([]func(), 0)
-
-				if canSwitchCell(cell, g.grid[y+1][x]) {
-					actions = append(actions, func() {
-						copyOfCell := g.grid[y+1][x]
-						g.grid[y+1][x] = cell
-						g.grid[y][x] = copyOfCell
-					})
-				}
-
-				if x+1 < gridSize && canSwitchCell(cell, g.grid[y+1][x+1]) {
-					actions = append(actions, func() {
-						copyOfCell := g.grid[y+1][x+1]
-						g.grid[y+1][x+1] = cell
-						g.grid[y][x] = copyOfCell
-					})
-				}
-
-				if x-1 >= 0 && canSwitchCell(cell, g.grid[y+1][x-1]) {
-					actions = append(actions, func() {
-						copyOfCell := g.grid[y+1][x-1]
-						g.grid[y+1][x-1] = cell
-						g.grid[y][x] = copyOfCell
-					})
-				}
-
-				if len(actions) == 0 {
-					if x+1 < gridSize && canSwitchCell(cell, g.grid[y][x+1]) {
-						actions = append(actions, func() {
-							copyOfCell := g.grid[y][x+1]
-							g.grid[y][x+1] = cell
-							g.grid[y][x] = copyOfCell
-						})
-					}
-					if x-1 >= 0 && canSwitchCell(cell, g.grid[y][x-1]) {
-						actions = append(actions, func() {
-							copyOfCell := g.grid[y][x-1]
-							g.grid[y][x-1] = cell
-							g.grid[y][x] = copyOfCell
-						})
-					}
-				}
-
-				// execute random action
-
-				if len(actions) > 0 {
-
-					randomIndex := rand.Intn(len(actions))
-					actions[randomIndex]()
-				}
-
-			}
-		},
 		cellType: Water,
-		liquid:   true,
-		density:  9,
 		color:    colors[rand.Intn(len(colors))],
+	}
+}
+
+func WaterPhysic(x int, y int, g *Game) {
+	if y+1 < gridSize {
+		cell := g.grid[y][x]
+		var actions = make([]func(), 0)
+
+		if canSwitchCell(cell, g.grid[y+1][x]) {
+			actions = append(actions, func() {
+				copyOfCell := g.grid[y+1][x]
+				g.grid[y+1][x] = cell
+				g.grid[y][x] = copyOfCell
+			})
+		}
+
+		if x+1 < gridSize && canSwitchCell(cell, g.grid[y+1][x+1]) {
+			actions = append(actions, func() {
+				copyOfCell := g.grid[y+1][x+1]
+				g.grid[y+1][x+1] = cell
+				g.grid[y][x] = copyOfCell
+			})
+		}
+
+		if x-1 >= 0 && canSwitchCell(cell, g.grid[y+1][x-1]) {
+			actions = append(actions, func() {
+				copyOfCell := g.grid[y+1][x-1]
+				g.grid[y+1][x-1] = cell
+				g.grid[y][x] = copyOfCell
+			})
+		}
+
+		if len(actions) == 0 {
+			if x+1 < gridSize && canSwitchCell(cell, g.grid[y][x+1]) {
+				actions = append(actions, func() {
+					copyOfCell := g.grid[y][x+1]
+					g.grid[y][x+1] = cell
+					g.grid[y][x] = copyOfCell
+				})
+			}
+			if x-1 >= 0 && canSwitchCell(cell, g.grid[y][x-1]) {
+				actions = append(actions, func() {
+					copyOfCell := g.grid[y][x-1]
+					g.grid[y][x-1] = cell
+					g.grid[y][x] = copyOfCell
+				})
+			}
+		}
+
+		// execute random action
+
+		if len(actions) > 0 {
+
+			randomIndex := rand.Intn(len(actions))
+			actions[randomIndex]()
+		}
+
 	}
 }
 
 func NewAirCell() Cell {
 	return Cell{
-		physic:   func(x int, y int, g *Game) {},
 		cellType: Air,
-		liquid:   false,
-		density:  0,
 		color:    color.RGBA{0, 0, 0, 255},
 	}
 }
 
 func NewMetalCell() Cell {
 	return Cell{
-		physic: func(x int, y int, g *Game) {
-		},
 		cellType: Metal,
-		liquid:   false,
-		density:  9999,
 		color:    color.RGBA{128, 128, 128, 255},
 	}
+}
+
+func NoPhysic(x int, y int, g *Game) {
 }
 
 func loadFont(size float64) (text.Face, error) {
@@ -455,7 +493,43 @@ func loadFont(size float64) (text.Face, error) {
 
 func canSwitchCell(origin Cell, target Cell) bool {
 	cellTypeDifferent := target.cellType != origin.cellType
-	hasOneLiquid := target.liquid || origin.liquid
-	targetDensityIsInferior := target.density < origin.density
+	dataOrigin := types[origin.cellType]
+	dataTarget := types[target.cellType]
+	hasOneLiquid := dataTarget.liquid || dataOrigin.liquid
+	targetDensityIsInferior := dataTarget.density < dataOrigin.density
 	return cellTypeDifferent && (target.cellType == Air || (hasOneLiquid && targetDensityIsInferior))
+}
+
+func hasADifferentNeighbor(x int, y int, cell Cell, g *Game) bool {
+	cellType := cell.cellType
+	rightIsOk := x+1 < gridSize
+	grid := g.grid
+	if rightIsOk && grid[y][x+1].cellType != cellType {
+		return true
+	}
+	leftIsOk := x-1 >= 0
+	if leftIsOk && grid[y][x-1].cellType != cellType {
+		return true
+	}
+	bottomIsOk := y+1 < gridSize
+	if bottomIsOk && grid[y+1][x].cellType != cellType {
+		return true
+	}
+	topIsOk := y-1 >= 0
+	if topIsOk && grid[y-1][x].cellType != cellType {
+		return true
+	}
+	if rightIsOk && bottomIsOk && grid[y+1][x+1].cellType != cellType {
+		return true
+	}
+	if leftIsOk && bottomIsOk && grid[y+1][x-1].cellType != cellType {
+		return true
+	}
+	if rightIsOk && topIsOk && grid[y-1][x+1].cellType != cellType {
+		return true
+	}
+	if leftIsOk && topIsOk && grid[y-1][x-1].cellType != cellType {
+		return true
+	}
+	return false
 }

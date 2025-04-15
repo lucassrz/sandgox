@@ -1,0 +1,1 @@
+hyperfine -N "go run ./main.go --benchmark true" "go run ../sandgox-comparison/main.go --benchmark true"
