@@ -354,29 +354,55 @@ func NewWaterCell() Cell {
 		physic: func(x int, y int, g *Game) {
 			if y+1 < gridSize {
 				cell := g.grid[y][x]
+				var actions = make([]func(), 0)
+
 				if canSwitchCell(cell, g.grid[y+1][x]) {
-					copyOfCell := g.grid[y+1][x]
-					g.grid[y+1][x] = cell
-					g.grid[y][x] = copyOfCell
-				} else if x-1 >= 0 && canSwitchCell(cell, g.grid[y+1][x-1]) {
-					copyOfCell := g.grid[y+1][x-1]
-
-					g.grid[y+1][x-1] = cell
-					g.grid[y][x] = copyOfCell
-				} else if x+1 < gridSize && canSwitchCell(cell, g.grid[y+1][x+1]) {
-					copyOfCell := g.grid[y+1][x+1]
-
-					g.grid[y+1][x+1] = cell
-					g.grid[y][x] = copyOfCell
-				} else if x+1 < gridSize && y+1 < gridSize && canSwitchCell(cell, g.grid[y][x+1]) {
-					copyOfCell := g.grid[y][x+1]
-					g.grid[y][x+1] = cell
-					g.grid[y][x] = copyOfCell
-				} else if x-1 >= 0 && y+1 < gridSize && canSwitchCell(cell, g.grid[y][x-1]) {
-					copyOfCell := g.grid[y][x-1]
-					g.grid[y][x-1] = cell
-					g.grid[y][x] = copyOfCell
+					actions = append(actions, func() {
+						copyOfCell := g.grid[y+1][x]
+						g.grid[y+1][x] = cell
+						g.grid[y][x] = copyOfCell
+					})
 				}
+
+				if x+1 < gridSize && canSwitchCell(cell, g.grid[y+1][x+1]) {
+					actions = append(actions, func() {
+						copyOfCell := g.grid[y+1][x+1]
+						g.grid[y+1][x+1] = cell
+						g.grid[y][x] = copyOfCell
+					})
+				}
+
+				if x-1 >= 0 && canSwitchCell(cell, g.grid[y+1][x-1]) {
+					actions = append(actions, func() {
+						copyOfCell := g.grid[y+1][x-1]
+						g.grid[y+1][x-1] = cell
+						g.grid[y][x] = copyOfCell
+					})
+				}
+
+				if x+1 < gridSize && canSwitchCell(cell, g.grid[y][x+1]) {
+					actions = append(actions, func() {
+						copyOfCell := g.grid[y][x+1]
+						g.grid[y][x+1] = cell
+						g.grid[y][x] = copyOfCell
+					})
+				}
+				if x-1 >= 0 && canSwitchCell(cell, g.grid[y][x-1]) {
+					actions = append(actions, func() {
+						copyOfCell := g.grid[y][x-1]
+						g.grid[y][x-1] = cell
+						g.grid[y][x] = copyOfCell
+					})
+				}
+
+				// execute random action
+
+				if len(actions) > 0 {
+
+					randomIndex := rand.Intn(len(actions))
+					actions[randomIndex]()
+				}
+
 			}
 		},
 		cellType: Water,
