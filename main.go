@@ -328,9 +328,31 @@ func NewWaterCell() Cell {
 	}
 	return Cell{
 		physic: func(x int, y int, g *Game) {
-			if y+1 < gridSize && g.grid[y+1][x].cellType == Air {
-				g.grid[y+1][x] = g.grid[y][x]
-				g.grid[y][x] = NewAirCell()
+			if y+1 < gridSize {
+				cell := g.grid[y][x]
+				if canSwitchCell(cell, g.grid[y+1][x]) {
+					copyOfCell := g.grid[y+1][x]
+					g.grid[y+1][x] = cell
+					g.grid[y][x] = copyOfCell
+				} else if x-1 >= 0 && canSwitchCell(cell, g.grid[y+1][x-1]) {
+					copyOfCell := g.grid[y+1][x-1]
+
+					g.grid[y+1][x-1] = cell
+					g.grid[y][x] = copyOfCell
+				} else if x+1 < gridSize && canSwitchCell(cell, g.grid[y+1][x+1]) {
+					copyOfCell := g.grid[y+1][x+1]
+
+					g.grid[y+1][x+1] = cell
+					g.grid[y][x] = copyOfCell
+				} else if x+1 < gridSize && y+1 < gridSize && canSwitchCell(cell, g.grid[y][x+1]) {
+					copyOfCell := g.grid[y][x+1]
+					g.grid[y][x+1] = cell
+					g.grid[y][x] = copyOfCell
+				} else if x-1 >= 0 && y+1 < gridSize && canSwitchCell(cell, g.grid[y][x-1]) {
+					copyOfCell := g.grid[y][x-1]
+					g.grid[y][x-1] = cell
+					g.grid[y][x] = copyOfCell
+				}
 			}
 		},
 		cellType: Water,
