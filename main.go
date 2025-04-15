@@ -3,17 +3,16 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/ebitenui/ebitenui"
 	image2 "github.com/ebitenui/ebitenui/image"
+	"github.com/ebitenui/ebitenui/widget"
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"golang.org/x/image/font/gofont/goregular"
 	"image/color"
 	"log"
 	"math/rand"
-
-	"github.com/ebitenui/ebitenui"
-	"github.com/ebitenui/ebitenui/widget"
-	"github.com/hajimehoshi/ebiten/v2"
 )
 
 const (
@@ -21,13 +20,14 @@ const (
 	screenHeight = 500
 	cellSize     = 5
 	gridSize     = screenWidth / cellSize
-	deltaTime    = 1.0 / 60.0
+	deltaTime    = 1.0 / 12.0
 )
 
 type Game struct {
 	grid             [gridSize][gridSize]Cell
 	ui               *ebitenui.UI
 	selectedCellType CellType
+	brushSize        int
 }
 
 type CellType int64
@@ -39,12 +39,16 @@ const (
 	Metal
 )
 
+var drawn bool = false
+var timeBetweenUpdates = 0
+
 type Cell struct {
 	physic   func(x int, y int, g *Game)
 	cellType CellType
 	color    color.Color
 	liquid   bool
 	density  int
+	updated  bool
 }
 
 type resources struct {
@@ -71,8 +75,8 @@ func newResources() *resources {
 		},
 		font: font,
 		padding: widget.Insets{
-			Left:   30,
-			Right:  30,
+			Left:   10,
+			Right:  10,
 			Top:    10,
 			Bottom: 10,
 		},
@@ -81,26 +85,43 @@ func newResources() *resources {
 
 func (g *Game) Update() error {
 	g.ui.Update()
-	for y := 0; y < gridSize; y++ {
-		for x := 0; x < gridSize; x++ {
-			g.grid[y][x].physic(x, y, g)
+	// create a time variable
+
+	// convert to unix time in milliseconds
+	if drawn {
+		for y := gridSize - 1; y >= 0; y-- {
+			for x := 0; x < gridSize; x++ {
+				//if !g.grid[gridSize-y][x].updated {
+				g.grid[y][x].physic(x, y, g)
+				//}
+			}
 		}
 	}
+
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		x, y := ebiten.CursorPosition()
+
 		if x >= 100 {
 			cellX := x / cellSize
 			cellY := y / cellSize
-			if cellX >= 0 && cellX < gridSize && cellY >= 0 && cellY < gridSize {
-				switch g.selectedCellType {
-				case Sand:
-					g.grid[cellY][cellX] = NewSandCell()
-				case Water:
-					g.grid[cellY][cellX] = NewWaterCell()
-				case Air:
-					g.grid[cellY][cellX] = NewAirCell()
-				case Metal:
-					g.grid[cellY][cellX] = NewMetalCell()
+
+			for offsetY := -g.brushSize; offsetY <= g.brushSize; offsetY++ {
+				for offsetX := -g.brushSize; offsetX <= g.brushSize; offsetX++ {
+					targetX := cellX + offsetX
+					targetY := cellY + offsetY
+
+					if targetX >= 0 && targetX < gridSize && targetY >= 0 && targetY < gridSize {
+						switch g.selectedCellType {
+						case Sand:
+							g.grid[targetY][targetX] = NewSandCell()
+						case Water:
+							g.grid[targetY][targetX] = NewWaterCell()
+						case Air:
+							g.grid[targetY][targetX] = NewAirCell()
+						case Metal:
+							g.grid[targetY][targetX] = NewMetalCell()
+						}
+					}
 				}
 			}
 		}
@@ -114,6 +135,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	for y := 0; y < gridSize; y++ {
 		for x := 0; x < gridSize; x++ {
 			cell := g.grid[y][x]
+			cell.updated = false
 			if cell.cellType != Air {
 				rect := ebiten.NewImage(cellSize, cellSize)
 				rect.Fill(cell.color)
@@ -127,6 +149,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.ui.Draw(screen)
 	ebiten.SetVsyncEnabled(false)
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()))
+	drawn = true
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -139,6 +162,7 @@ func main() {
 	game := &Game{
 		grid:             initGrid(),
 		selectedCellType: Sand,
+		brushSize:        1,
 	}
 	game.setupUI()
 
@@ -201,6 +225,47 @@ func (g *Game) setupUI() {
 	buttonContainer.AddChild(airButton)
 	buttonContainer.AddChild(metalButton)
 
+	brushButtonContainer := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(10),
+		),
+		), widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(100, 0)))
+
+	smallBrushButton := widget.NewButton(
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		widget.ButtonOpts.Image(res.buttonImage),
+		widget.ButtonOpts.Text("1", res.font, res.textColor),
+		widget.ButtonOpts.TextPadding(res.padding),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			g.brushSize = 0
+		}),
+	)
+
+	mediumBrushButton := widget.NewButton(
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		widget.ButtonOpts.Image(res.buttonImage),
+		widget.ButtonOpts.Text("3", res.font, res.textColor),
+		widget.ButtonOpts.TextPadding(res.padding),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			g.brushSize = 1
+		}),
+	)
+
+	largeBrushButton := widget.NewButton(
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		widget.ButtonOpts.Image(res.buttonImage),
+		widget.ButtonOpts.Text("7", res.font, res.textColor),
+		widget.ButtonOpts.TextPadding(res.padding),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			g.brushSize = 3
+		}),
+	)
+
+	brushButtonContainer.AddChild(smallBrushButton)
+	brushButtonContainer.AddChild(mediumBrushButton)
+	brushButtonContainer.AddChild(largeBrushButton)
+	buttonContainer.AddChild(brushButtonContainer)
 	rootContainer := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
@@ -229,7 +294,6 @@ func NewSandCell() Cell {
 	}
 	return Cell{
 		physic: func(x int, y int, g *Game) {
-			fmt.Println("Sand physic" + fmt.Sprintf("x: %d, y: %d", x, y))
 			if y+1 < gridSize {
 				cell := g.grid[y][x]
 				if canSwitchCell(cell, g.grid[y+1][x]) {
@@ -238,10 +302,12 @@ func NewSandCell() Cell {
 					g.grid[y][x] = copyOfCell
 				} else if x-1 >= 0 && canSwitchCell(cell, g.grid[y+1][x-1]) {
 					copyOfCell := g.grid[y+1][x-1]
+
 					g.grid[y+1][x-1] = cell
 					g.grid[y][x] = copyOfCell
 				} else if x+1 < gridSize && canSwitchCell(cell, g.grid[y+1][x+1]) {
 					copyOfCell := g.grid[y+1][x+1]
+
 					g.grid[y+1][x+1] = cell
 					g.grid[y][x] = copyOfCell
 				}
