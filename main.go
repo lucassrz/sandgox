@@ -138,12 +138,11 @@ func (g *Game) Update() error {
 }
 
 func benchmarkCheck(game *Game) {
-	lineIsFull := false
+	lineIsFull := true
 	for i := 0; i < gridSize; i++ {
 		if game.grid[gridSize-1][i].cellType == Air {
+			lineIsFull = false
 			break
-		} else {
-			lineIsFull = true
 		}
 	}
 
@@ -386,19 +385,21 @@ func NewWaterCell() Cell {
 					})
 				}
 
-				if x+1 < gridSize && canSwitchCell(cell, g.grid[y][x+1]) {
-					actions = append(actions, func() {
-						copyOfCell := g.grid[y][x+1]
-						g.grid[y][x+1] = cell
-						g.grid[y][x] = copyOfCell
-					})
-				}
-				if x-1 >= 0 && canSwitchCell(cell, g.grid[y][x-1]) {
-					actions = append(actions, func() {
-						copyOfCell := g.grid[y][x-1]
-						g.grid[y][x-1] = cell
-						g.grid[y][x] = copyOfCell
-					})
+				if len(actions) == 0 {
+					if x+1 < gridSize && canSwitchCell(cell, g.grid[y][x+1]) {
+						actions = append(actions, func() {
+							copyOfCell := g.grid[y][x+1]
+							g.grid[y][x+1] = cell
+							g.grid[y][x] = copyOfCell
+						})
+					}
+					if x-1 >= 0 && canSwitchCell(cell, g.grid[y][x-1]) {
+						actions = append(actions, func() {
+							copyOfCell := g.grid[y][x-1]
+							g.grid[y][x-1] = cell
+							g.grid[y][x] = copyOfCell
+						})
+					}
 				}
 
 				// execute random action
