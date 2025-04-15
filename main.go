@@ -81,7 +81,11 @@ func newResources() *resources {
 
 func (g *Game) Update() error {
 	g.ui.Update()
-
+	for y := 0; y < gridSize; y++ {
+		for x := 0; x < gridSize; x++ {
+			g.grid[y][x].physic(x, y, g)
+		}
+	}
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		x, y := ebiten.CursorPosition()
 		if x >= 100 {
@@ -109,12 +113,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	for y := 0; y < gridSize; y++ {
 		for x := 0; x < gridSize; x++ {
-			g.grid[y][x].physic(x, y, g)
-		}
-	}
-
-	for y := 0; y < gridSize; y++ {
-		for x := 0; x < gridSize; x++ {
 			cell := g.grid[y][x]
 			if cell.cellType != Air {
 				rect := ebiten.NewImage(cellSize, cellSize)
@@ -138,7 +136,6 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 func main() {
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 	ebiten.SetWindowTitle("Pixel Sand Simulation")
-
 	game := &Game{
 		grid:             initGrid(),
 		selectedCellType: Sand,
@@ -152,7 +149,6 @@ func main() {
 
 func (g *Game) setupUI() {
 	res := newResources()
-
 	sandButton := widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 		widget.ButtonOpts.Image(res.buttonImage),
@@ -233,6 +229,7 @@ func NewSandCell() Cell {
 	}
 	return Cell{
 		physic: func(x int, y int, g *Game) {
+			fmt.Println("Sand physic" + fmt.Sprintf("x: %d, y: %d", x, y))
 			if y+1 < gridSize {
 				cell := g.grid[y][x]
 				if canSwitchCell(cell, g.grid[y+1][x]) {
