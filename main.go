@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"image/color"
 	"log"
 	"math/rand"
@@ -48,8 +50,9 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-
 	screen.Fill(color.Black)
+	ebiten.SetVsyncEnabled(false)
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()))
 	for y := 0; y < gridSize; y++ {
 		for x := 0; x < gridSize; x++ {
 			g.grid[y][x].physic(x, y, g)
