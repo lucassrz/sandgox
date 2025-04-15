@@ -178,7 +178,7 @@ func main() {
 	flag.Parse()
 	benchmarkMode = *benchmarkModeUnparsed
 	ebiten.SetWindowSize(screenWidth, screenHeight)
-	ebiten.SetWindowTitle("Pixel Sand Simulation")
+	ebiten.SetWindowTitle("sandgox")
 	game := &Game{
 		grid:             initGrid(),
 		selectedCellType: Sand,
