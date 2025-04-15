@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"github.com/ebitenui/ebitenui"
 	image2 "github.com/ebitenui/ebitenui/image"
@@ -13,6 +14,7 @@ import (
 	"image/color"
 	"log"
 	"math/rand"
+	"os"
 )
 
 const (
@@ -41,6 +43,7 @@ const (
 
 var drawn bool = false
 var timeBetweenUpdates = 0
+var benchmarkMode bool = false
 
 type Cell struct {
 	physic   func(x int, y int, g *Game)
@@ -126,7 +129,21 @@ func (g *Game) Update() error {
 			}
 		}
 	}
+
+	benchmarkCheck(g)
+
 	return nil
+}
+
+func benchmarkCheck(game *Game) {
+	lineIsFull := false
+	for i := 0; i < gridSize; i++ {
+		lineIsFull = game.grid[gridSize-1][i].cellType != Air
+	}
+
+	if lineIsFull {
+		os.Exit(0)
+	}
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -157,6 +174,9 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 }
 
 func main() {
+	benchmarkModeUnparsed := flag.Bool("benchmark", false, "benchmark mode")
+	flag.Parse()
+	benchmarkMode = *benchmarkModeUnparsed
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 	ebiten.SetWindowTitle("Pixel Sand Simulation")
 	game := &Game{
@@ -280,7 +300,11 @@ func initGrid() [gridSize][gridSize]Cell {
 	grid := [gridSize][gridSize]Cell{}
 	for y := 0; y < gridSize; y++ {
 		for x := 0; x < gridSize; x++ {
-			grid[y][x] = NewAirCell()
+			if benchmarkMode && y < 10 {
+				grid[y][x] = NewWaterCell()
+			} else {
+				grid[y][x] = NewAirCell()
+			}
 		}
 	}
 	return grid
