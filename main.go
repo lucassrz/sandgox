@@ -44,6 +44,7 @@ const (
 var drawn bool = false
 var timeBetweenUpdates = 0
 var benchmarkMode bool = false
+var updateCount int = 0
 
 type Cell struct {
 	physic   func(x int, y int, g *Game)
@@ -130,23 +131,12 @@ func (g *Game) Update() error {
 		}
 	}
 
-	if benchmarkMode {
-		benchmarkCheck(g)
-	}
-
 	return nil
 }
 
-func benchmarkCheck(game *Game) {
-	lineIsFull := true
-	for i := 0; i < gridSize; i++ {
-		if game.grid[gridSize-1][i].cellType == Air {
-			lineIsFull = false
-			break
-		}
-	}
-
-	if lineIsFull {
+func benchmarkCheck() {
+	updateCount++
+	if updateCount >= 100 {
 		os.Exit(0)
 	}
 }
@@ -172,6 +162,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	ebiten.SetVsyncEnabled(false)
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()))
 	drawn = true
+
+	if benchmarkMode {
+		benchmarkCheck()
+	}
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
