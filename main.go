@@ -44,6 +44,7 @@ const (
 var drawn bool = false
 var timeBetweenUpdates = 0
 var benchmarkMode bool = false
+var countUpdate int = 0
 
 type Cell struct {
 	cellType CellType
@@ -167,24 +168,13 @@ func (g *Game) Update() error {
 		}
 	}
 
-	if benchmarkMode {
-		benchmarkCheck(g)
-	}
-
 	//println("Time taken for update: ", time.Since(startTime).Milliseconds(), "ms")
 	return nil
 }
 
-func benchmarkCheck(game *Game) {
-	lineIsFull := true
-	for i := 0; i < gridSize; i++ {
-		if game.grid[gridSize-1][i].cellType == Air {
-			lineIsFull = false
-			break
-		}
-	}
-
-	if lineIsFull {
+func benchmarkCheck() {
+	countUpdate++
+	if countUpdate >= 100 {
 		os.Exit(0)
 	}
 }
@@ -217,6 +207,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()))
 	drawn = true
 	//println("Time taken for draw: ", time.Since(startTime).Milliseconds(), "ms")
+
+	if benchmarkMode {
+		benchmarkCheck()
+	}
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
