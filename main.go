@@ -300,6 +300,8 @@ func initGrid() [gridSize][gridSize]Cell {
 	for y := 0; y < gridSize; y++ {
 		for x := 0; x < gridSize; x++ {
 			if benchmarkMode && y < 10 {
+				grid[y][x] = NewSandCell()
+			} else if benchmarkMode && y > 80 {
 				grid[y][x] = NewWaterCell()
 			} else {
 				grid[y][x] = NewAirCell()
