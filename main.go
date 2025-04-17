@@ -16,6 +16,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"time"
 )
 
 const (
@@ -51,6 +52,8 @@ const (
 
 var benchmarkMode = false
 var countUpdate = 0
+var isChangingBrush = false
+var changingBrushTime = 0
 
 type Cell struct {
 	cellType CellType
@@ -137,6 +140,7 @@ type resources struct {
 	buttonImage *widget.ButtonImage
 	font        text.Face
 	textColor   *widget.ButtonTextColor
+	sliderImage *widget.SliderTrackImage
 	padding     widget.Insets
 }
 
@@ -144,6 +148,7 @@ func newResources() *resources {
 	idle := image2.NewNineSliceColor(color.NRGBA{R: 0x33, G: 0x33, B: 0x33, A: 0xff})
 	hover := image2.NewNineSliceColor(color.NRGBA{R: 0x44, G: 0x44, B: 0x44, A: 0xff})
 	pressed := image2.NewNineSliceColor(color.NRGBA{R: 0x22, G: 0x22, B: 0x22, A: 0xff})
+	sliderImage := image2.NewNineSliceColor(color.NRGBA{R: 0x22, G: 0x22, B: 0x22, A: 0xff})
 
 	font, _ := loadFont(10)
 	return &resources{
@@ -154,6 +159,10 @@ func newResources() *resources {
 		},
 		textColor: &widget.ButtonTextColor{
 			Idle: color.NRGBA{R: 0xdf, G: 0xf4, B: 0xff, A: 0xff},
+		},
+		sliderImage: &widget.SliderTrackImage{
+			Idle:  sliderImage,
+			Hover: sliderImage,
 		},
 		font: font,
 		padding: widget.Insets{
@@ -263,6 +272,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		screenBufferImg.Fill(color.RGBA{})
 	}
 
+	op := &ebiten.DrawImageOptions{}
+
 	//maxNumberOfColors := len(types)
 	pointsByColor := make(map[color.Color][][]bool)
 	for y := 0; y < gridSize; y++ {
@@ -287,8 +298,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	verticalRectangles(pointsByColor, rectanglesByColor)
 	//horizontalRectangles(pointsByColor, rectanglesByColor)
 
-	op := &ebiten.DrawImageOptions{}
-
 	for col, rects := range rectanglesByColor {
 		for _, rectangle := range rects {
 			rect := getRectImageByWidth(rectangle.w)
@@ -299,9 +308,21 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 	}
 	//g.screenBufferImg.ReplacePixels(g.screenBuffer.Pix)
+
 	op = &ebiten.DrawImageOptions{}
 
 	screen.DrawImage(screenBufferImg, op)
+	if isChangingBrush {
+		op.GeoM.Reset()
+		op.GeoM.Translate(float64((50-g.brushSize)*cellSize), float64((50-g.brushSize)*cellSize))
+		rect := ebiten.NewImage((g.brushSize*2+1)*cellSize, (g.brushSize*2+1)*cellSize)
+		rect.Fill(color.RGBA{R: 255, G: 255, B: 255, A: 255})
+		screen.DrawImage(rect, op)
+		if time.Now().Second() != changingBrushTime {
+			isChangingBrush = false
+		}
+	}
+
 	g.ui.Draw(screen)
 	ebiten.SetVsyncEnabled(false)
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()))
@@ -386,66 +407,42 @@ func main() {
 	}
 }
 
+func createButton(g *Game, res *resources, label string, cellType CellType) *widget.Button {
+	return widget.NewButton(
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		widget.ButtonOpts.Image(res.buttonImage),
+		widget.ButtonOpts.Text(label, res.font, res.textColor),
+		widget.ButtonOpts.TextPadding(res.padding),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			g.selectedCellType = cellType
+		}),
+	)
+}
+
+type buttonData struct {
+	label    string
+	cellType CellType
+}
+
 func (g *Game) setupUI() {
 	res := newResources()
-	sandButton := widget.NewButton(
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-		widget.ButtonOpts.Image(res.buttonImage),
-		widget.ButtonOpts.Text("Sand", res.font, res.textColor),
-		widget.ButtonOpts.TextPadding(res.padding),
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			g.selectedCellType = Sand
-		}),
-	)
+	var buttons = make([]*widget.Button, 0)
+	var elements = []buttonData{{"Sand", Sand}, {"Water", Water}, {"Air", Air}, {"Metal", Metal}, {"Black Hole", BlackHole}, {"Water Generator", WaterGenerator}}
 
-	waterButton := widget.NewButton(
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-		widget.ButtonOpts.Image(res.buttonImage),
-		widget.ButtonOpts.Text("Water", res.font, res.textColor),
-		widget.ButtonOpts.TextPadding(res.padding),
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			g.selectedCellType = Water
-		}),
-	)
+	for _, el := range elements {
+		buttons = append(buttons, createButton(g, res, el.label, el.cellType))
+	}
 
-	airButton := widget.NewButton(
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-		widget.ButtonOpts.Image(res.buttonImage),
-		widget.ButtonOpts.Text("Air", res.font, res.textColor),
-		widget.ButtonOpts.TextPadding(res.padding),
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			g.selectedCellType = Air
+	slider := widget.NewSlider(
+		widget.SliderOpts.MinMax(0, 20),
+		widget.SliderOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		widget.SliderOpts.Images(res.sliderImage, res.buttonImage),
+		widget.SliderOpts.ChangedHandler(func(args *widget.SliderChangedEventArgs) {
+			g.brushSize = args.Current
+			isChangingBrush = true
+			changingBrushTime = time.Now().Second()
 		}),
-	)
-
-	metalButton := widget.NewButton(
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-		widget.ButtonOpts.Image(res.buttonImage),
-		widget.ButtonOpts.Text("Metal", res.font, res.textColor),
-		widget.ButtonOpts.TextPadding(res.padding),
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			g.selectedCellType = Metal
-		}),
-	)
-
-	blackHoleButton := widget.NewButton(
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-		widget.ButtonOpts.Image(res.buttonImage),
-		widget.ButtonOpts.Text("Black Hole", res.font, res.textColor),
-		widget.ButtonOpts.TextPadding(res.padding),
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			g.selectedCellType = BlackHole
-		}),
-	)
-
-	waterGeneratorButton := widget.NewButton(
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-		widget.ButtonOpts.Image(res.buttonImage),
-		widget.ButtonOpts.Text("Water gen", res.font, res.textColor),
-		widget.ButtonOpts.TextPadding(res.padding),
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			g.selectedCellType = WaterGenerator
-		}),
+		widget.SliderOpts.Direction(widget.DirectionHorizontal),
 	)
 
 	buttonContainer := widget.NewContainer(
@@ -455,12 +452,11 @@ func (g *Game) setupUI() {
 		),
 		), widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(100, 0)))
 
-	buttonContainer.AddChild(sandButton)
-	buttonContainer.AddChild(waterButton)
-	buttonContainer.AddChild(airButton)
-	buttonContainer.AddChild(metalButton)
-	buttonContainer.AddChild(blackHoleButton)
-	buttonContainer.AddChild(waterGeneratorButton)
+	for _, button := range buttons {
+		buttonContainer.AddChild(button)
+	}
+
+	buttonContainer.AddChild(slider)
 
 	brushButtonContainer := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -469,39 +465,6 @@ func (g *Game) setupUI() {
 		),
 		), widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(100, 0)))
 
-	smallBrushButton := widget.NewButton(
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-		widget.ButtonOpts.Image(res.buttonImage),
-		widget.ButtonOpts.Text("1", res.font, res.textColor),
-		widget.ButtonOpts.TextPadding(res.padding),
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			g.brushSize = 0
-		}),
-	)
-
-	mediumBrushButton := widget.NewButton(
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-		widget.ButtonOpts.Image(res.buttonImage),
-		widget.ButtonOpts.Text("3", res.font, res.textColor),
-		widget.ButtonOpts.TextPadding(res.padding),
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			g.brushSize = 1
-		}),
-	)
-
-	largeBrushButton := widget.NewButton(
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-		widget.ButtonOpts.Image(res.buttonImage),
-		widget.ButtonOpts.Text("7", res.font, res.textColor),
-		widget.ButtonOpts.TextPadding(res.padding),
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			g.brushSize = 3
-		}),
-	)
-
-	brushButtonContainer.AddChild(smallBrushButton)
-	brushButtonContainer.AddChild(mediumBrushButton)
-	brushButtonContainer.AddChild(largeBrushButton)
 	buttonContainer.AddChild(brushButtonContainer)
 	rootContainer := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
