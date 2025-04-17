@@ -22,6 +22,7 @@ import (
 const (
 	screenWidth  = 500
 	screenHeight = 500
+	menuWidth    = 100
 	cellSize     = 5
 	gridSize     = screenWidth / cellSize
 )
@@ -217,7 +218,7 @@ func (g *Game) Update() error {
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		x, y := ebiten.CursorPosition()
 
-		if x >= 100 {
+		if x <= screenWidth {
 			cellX := x / cellSize
 			cellY := y / cellSize
 
@@ -226,21 +227,23 @@ func (g *Game) Update() error {
 					targetX := cellX + offsetX
 					targetY := cellY + offsetY
 					if targetX >= 0 && targetX < gridSize && targetY >= 0 && targetY < gridSize {
-						switch g.selectedCellType {
-						case Sand:
-							g.grid[targetY][targetX] = NewSandCell()
-						case Water:
-							g.grid[targetY][targetX] = NewWaterCell()
-						case Air:
-							g.grid[targetY][targetX] = NewAirCell()
-						case Metal:
-							g.grid[targetY][targetX] = NewMetalCell()
-						case BlackHole:
-							g.grid[targetY][targetX] = NewBlackHoleCell()
-						case WaterGenerator:
-							g.grid[targetY][targetX] = NewWaterGeneratorCell()
-						}
 
+						if g.selectedCellType == Air || g.grid[targetY][targetX].cellType == Air {
+							switch g.selectedCellType {
+							case Sand:
+								g.grid[targetY][targetX] = NewSandCell()
+							case Water:
+								g.grid[targetY][targetX] = NewWaterCell()
+							case Air:
+								g.grid[targetY][targetX] = NewAirCell()
+							case Metal:
+								g.grid[targetY][targetX] = NewMetalCell()
+							case BlackHole:
+								g.grid[targetY][targetX] = NewBlackHoleCell()
+							case WaterGenerator:
+								g.grid[targetY][targetX] = NewWaterGeneratorCell()
+							}
+						}
 					}
 				}
 			}
@@ -384,14 +387,14 @@ func getRectImageByWidth(width int) *ebiten.Image {
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
-	return screenWidth, screenHeight
+	return screenWidth + menuWidth, screenHeight
 }
 
 func main() {
 	benchmarkModeUnparsed := flag.Bool("benchmark", false, "benchmark mode")
 	flag.Parse()
 	benchmarkMode = *benchmarkModeUnparsed
-	ebiten.SetWindowSize(screenWidth, screenHeight)
+	ebiten.SetWindowSize(screenWidth+menuWidth, screenHeight)
 	ebiten.SetWindowTitle("sandgox")
 	initTypes()
 	game := &Game{
@@ -466,8 +469,23 @@ func (g *Game) setupUI() {
 		), widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(100, 0)))
 
 	buttonContainer.AddChild(brushButtonContainer)
+
 	rootContainer := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Padding(
+				widget.Insets{
+					Left:   screenWidth,
+					Right:  0,
+					Top:    0,
+					Bottom: 0,
+				},
+			),
+		)),
+		//widget.ContainerOpts.WidgetOpts(
+		//	widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+		//		HorizontalPosition: widget.AnchorLayoutPositionEnd,
+		//		StretchVertical:    true,
+		//	})),
 	)
 	rootContainer.AddChild(buttonContainer)
 	g.ui = &ebitenui.UI{
@@ -521,15 +539,18 @@ func SandPhysic(x int, y int, g *Game) {
 				switchPlace(x, y, x, y+1, g)
 			})
 		}
-		if x-1 >= 0 && canSwitchCell(cell, g.grid[y+1][x-1]) {
-			actions = append(actions, func() {
-				switchPlace(x, y, x-1, y+1, g)
-			})
-		}
-		if x+1 < gridSize && canSwitchCell(cell, g.grid[y+1][x+1]) {
-			actions = append(actions, func() {
-				switchPlace(x, y, x+1, y+1, g)
-			})
+		if len(actions) == 0 {
+
+			if x-1 >= 0 && canSwitchCell(cell, g.grid[y+1][x-1]) {
+				actions = append(actions, func() {
+					switchPlace(x, y, x-1, y+1, g)
+				})
+			}
+			if x+1 < gridSize && canSwitchCell(cell, g.grid[y+1][x+1]) {
+				actions = append(actions, func() {
+					switchPlace(x, y, x+1, y+1, g)
+				})
+			}
 		}
 
 		if len(actions) != 0 {
