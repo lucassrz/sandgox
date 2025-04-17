@@ -519,8 +519,14 @@ func initGrid() [gridSize][gridSize]Cell {
 		for x := 0; x < gridSize; x++ {
 			if benchmarkMode && y < 10 {
 				grid[y][x] = NewSandCell()
-			} else if benchmarkMode && y > 80 {
+			} else if benchmarkMode && y > 80 && x > 40 && x < 60 {
 				grid[y][x] = NewWaterCell()
+			} else if benchmarkMode && y == 50 && x > 20 && x < 40 {
+				grid[y][x] = NewMetalCell()
+			} else if benchmarkMode && y == 50 && x > 60 && x < 95 {
+				grid[y][x] = NewBlackHoleCell()
+			} else if benchmarkMode && y == 30 && x > 74 && x < 78 {
+				grid[y][x] = NewWaterGeneratorCell()
 			} else {
 				grid[y][x] = NewAirCell()
 			}
