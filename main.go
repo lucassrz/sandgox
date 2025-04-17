@@ -39,6 +39,8 @@ const (
 	Sand
 	Water
 	Metal
+	WaterGenerator
+	BlackHole
 )
 
 var drawn bool = false
@@ -305,6 +307,10 @@ func initGrid() [gridSize][gridSize]Cell {
 				grid[y][x] = NewWaterCell()
 			} else if benchmarkMode && y == 50 && x > 20 && x < 40 {
 				grid[y][x] = NewMetalCell()
+			} else if benchmarkMode && y == 50 && x > 60 && x < 95 {
+				grid[y][x] = NewBlackHoleCell()
+			} else if benchmarkMode && y == 30 && x > 74 && x < 78 {
+				grid[y][x] = NewWaterGeneratorCell()
 			} else {
 				grid[y][x] = NewAirCell()
 			}
@@ -435,6 +441,50 @@ func NewMetalCell() Cell {
 		liquid:   false,
 		density:  9999,
 		color:    color.RGBA{128, 128, 128, 255},
+	}
+}
+
+func NewBlackHoleCell() Cell {
+	return Cell{
+		cellType: BlackHole,
+		color:    color.RGBA{52, 8, 54, 255},
+		density:  9999,
+		liquid:   false,
+		physic: func(x int, y int, g *Game) {
+			for offsetY := -1; offsetY <= 1; offsetY++ {
+				for offsetX := -1; offsetX <= 1; offsetX++ {
+					targetX := x + offsetX
+					targetY := y + offsetY
+					if targetX >= 0 && targetX < gridSize && targetY >= 0 && targetY < gridSize {
+						if g.grid[targetY][targetX].cellType != BlackHole {
+							g.grid[targetY][targetX] = NewAirCell()
+						}
+					}
+				}
+			}
+		},
+	}
+}
+
+func NewWaterGeneratorCell() Cell {
+	return Cell{
+		cellType: WaterGenerator,
+		color:    color.RGBA{95, 78, 158, 255},
+		density:  9999,
+		liquid:   false,
+		physic: func(x int, y int, g *Game) {
+			for offsetY := -1; offsetY <= 1; offsetY++ {
+				for offsetX := -1; offsetX <= 1; offsetX++ {
+					targetX := x + offsetX
+					targetY := y + offsetY
+					if targetX >= 0 && targetX < gridSize && targetY >= 0 && targetY < gridSize {
+						if g.grid[targetY][targetX].cellType == Air {
+							g.grid[targetY][targetX] = NewWaterCell()
+						}
+					}
+				}
+			}
+		},
 	}
 }
 
