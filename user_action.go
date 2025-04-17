@@ -7,6 +7,8 @@ func handleClick(g *Game) {
 		x, y := ebiten.CursorPosition()
 
 		if x <= screenWidth {
+			isChangingBrush = false
+
 			cellX := x / cellSize
 			cellY := y / cellSize
 			cellConstructor := getCellConstructor(g)
@@ -15,7 +17,7 @@ func handleClick(g *Game) {
 					targetX := cellX + offsetX
 					targetY := cellY + offsetY
 					if targetX >= 0 && targetX < gridSize && targetY >= 0 && targetY < gridSize {
-						if g.selectedCellType == Air || g.grid[targetY][targetX].cellType == Air {
+						if g.selectedCellType == Air || g.selectedCellType == BlackHole || g.grid[targetY][targetX].cellType == Air {
 							g.grid[targetY][targetX] = cellConstructor()
 						}
 					}

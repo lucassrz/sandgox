@@ -22,10 +22,6 @@ const (
 	gridSize     = screenWidth / cellSize
 )
 
-var (
-	screenBufferImg *ebiten.Image
-)
-
 type Game struct {
 	grid             [gridSize][gridSize]Cell
 	ui               *ebitenui.UI

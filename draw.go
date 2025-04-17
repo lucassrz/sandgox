@@ -3,7 +3,13 @@ package main
 import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"image/color"
+	"runtime"
 	"time"
+)
+
+var (
+	screenBufferImg *ebiten.Image
+	cpus            int = runtime.NumCPU()
 )
 
 func groupRectanglesHorizontallyByColor(pointsByColor map[color.Color][][]bool) map[color.Color][]Rect {
