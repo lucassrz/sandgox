@@ -22,7 +22,6 @@ const (
 	screenHeight = 500
 	cellSize     = 5
 	gridSize     = screenWidth / cellSize
-	deltaTime    = 1.0 / 12.0
 )
 
 type Game struct {
@@ -39,12 +38,12 @@ const (
 	Sand
 	Water
 	Metal
+	WaterGenerator
+	BlackHole
 )
 
-var drawn bool = false
-var timeBetweenUpdates = 0
-var benchmarkMode bool = false
-var countUpdate int = 0
+var benchmarkMode = false
+var countUpdate = 0
 
 type Cell struct {
 	cellType CellType
@@ -81,7 +80,49 @@ func initTypes() {
 			liquid:  false,
 			density: 9999,
 		},
+		BlackHole: {
+			physic:  BlackHolePhysic,
+			liquid:  false,
+			density: 9999,
+		},
+		WaterGenerator: {
+			physic:  WaterGeneratorPhysic,
+			liquid:  false,
+			density: 9999,
+		},
 	}
+}
+
+func BlackHolePhysic(x int, y int, g *Game) {
+	// destroy all cells around black hole
+
+	for offsetY := -1; offsetY <= 1; offsetY++ {
+		for offsetX := -1; offsetX <= 1; offsetX++ {
+			targetX := x + offsetX
+			targetY := y + offsetY
+			if targetX >= 0 && targetX < gridSize && targetY >= 0 && targetY < gridSize {
+				if g.grid[targetY][targetX].cellType != BlackHole {
+					g.grid[targetY][targetX] = NewAirCell()
+				}
+			}
+		}
+	}
+}
+
+func WaterGeneratorPhysic(x int, y int, g *Game) {
+	// generate water all around cell
+	for offsetY := -1; offsetY <= 1; offsetY++ {
+		for offsetX := -1; offsetX <= 1; offsetX++ {
+			targetX := x + offsetX
+			targetY := y + offsetY
+			if targetX >= 0 && targetX < gridSize && targetY >= 0 && targetY < gridSize {
+				if g.grid[targetY][targetX].cellType == Air {
+					g.grid[targetY][targetX] = NewWaterCell()
+				}
+			}
+		}
+	}
+
 }
 
 type resources struct {
@@ -116,12 +157,6 @@ func newResources() *resources {
 	}
 }
 
-type UpdateCell struct {
-	updateFunc func(x int, y int, g *Game)
-	PosX       int
-	PosY       int
-}
-
 func (g *Game) Update() error {
 
 	//var startTime = time.Now()
@@ -129,13 +164,9 @@ func (g *Game) Update() error {
 	// create a time variable
 
 	// convert to unix time in milliseconds
-	if drawn {
-		for y, row := range g.grid {
-			for x, cell := range row {
-				if cell.cellType != Air {
-					types[cell.cellType].physic(x, y, g)
-				}
-			}
+	for y, row := range g.grid {
+		for x, cell := range row {
+			types[cell.cellType].physic(x, y, g)
 		}
 	}
 
@@ -150,7 +181,6 @@ func (g *Game) Update() error {
 				for offsetX := -g.brushSize; offsetX <= g.brushSize; offsetX++ {
 					targetX := cellX + offsetX
 					targetY := cellY + offsetY
-
 					if targetX >= 0 && targetX < gridSize && targetY >= 0 && targetY < gridSize {
 						switch g.selectedCellType {
 						case Sand:
@@ -161,14 +191,19 @@ func (g *Game) Update() error {
 							g.grid[targetY][targetX] = NewAirCell()
 						case Metal:
 							g.grid[targetY][targetX] = NewMetalCell()
+						case BlackHole:
+							g.grid[targetY][targetX] = NewBlackHoleCell()
+						case WaterGenerator:
+							g.grid[targetY][targetX] = NewWaterGeneratorCell()
 						}
+
 					}
 				}
 			}
 		}
 	}
 
-	//println("Time taken for update: ", time.Since(startTime).Milliseconds(), "ms")
+	//println("Time taken for update: ", time.Since(startTime).Nanoseconds(), "ns")
 	return nil
 }
 
@@ -179,38 +214,103 @@ func benchmarkCheck() {
 	}
 }
 
-type ImageToDraw struct {
-	image *ebiten.Image
-	op    *ebiten.DrawImageOptions
+type Rect struct {
+	x int
+	y int
+	w int
+	h int
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	//var startTime = time.Now()
-	screen.Fill(color.Black)
-
-	// Pré-créer une image pour les cellules
-	rect := ebiten.NewImage(cellSize, cellSize)
-	op := &ebiten.DrawImageOptions{}
+	pointsByColor := make(map[color.Color][][]bool)
 	for y := 0; y < gridSize; y++ {
 		for x := 0; x < gridSize; x++ {
 			cell := g.grid[y][x]
-			if cell.cellType != Air {
-				rect.Fill(cell.color) // Remplir avec la couleur de la cellule
-				op.GeoM.Reset()       // Réinitialiser les transformations
-				op.GeoM.Translate(float64(x*cellSize), float64(y*cellSize))
-				screen.DrawImage(rect, op)
+			if pointsByColor[cell.color] == nil {
+				pointsByColor[cell.color] = make([][]bool, gridSize)
+				for i := range pointsByColor[cell.color] {
+					pointsByColor[cell.color][i] = make([]bool, gridSize)
+					for j := range pointsByColor[cell.color][i] {
+						pointsByColor[cell.color][i][j] = false
+					}
+				}
 			}
+			pointsByColor[cell.color][y][x] = true
+		}
+	}
+
+	rectanglesByColor := make(map[color.Color][]Rect)
+	verticalRectangles(pointsByColor, rectanglesByColor)
+	//horizontalRectangles(pointsByColor, rectanglesByColor)
+
+	op := &ebiten.DrawImageOptions{}
+	for col, rects := range rectanglesByColor {
+		for _, rectangle := range rects {
+			rect := getRectImageByWidth(rectangle.w)
+			rect.Fill(col)
+			op.GeoM.Reset()
+			op.GeoM.Translate(float64(rectangle.x*cellSize), float64(rectangle.y*cellSize))
+			screen.DrawImage(rect, op)
 		}
 	}
 	g.ui.Draw(screen)
 	ebiten.SetVsyncEnabled(false)
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()))
-	drawn = true
-	//println("Time taken for draw: ", time.Since(startTime).Milliseconds(), "ms")
+	//println("Time taken for draw: ", time.Since(startTime).Nanoseconds(), "ns")
 
 	if benchmarkMode {
 		benchmarkCheck()
 	}
+}
+
+func verticalRectangles(pointsByColor map[color.Color][][]bool, rectanglesByColor map[color.Color][]Rect) {
+
+	for col, points := range pointsByColor {
+		for y, row := range points {
+			posX := 0
+			width := 0
+			for x, point := range row {
+				if point {
+					if width == 0 {
+						posX = x
+						width = 1
+					} else {
+						width++
+					}
+				} else if width > 0 {
+					rectanglesByColor[col] = append(rectanglesByColor[col], Rect{
+						x: posX,
+						y: y,
+						w: width,
+						h: 1,
+					})
+					width = 0
+				} else {
+					width = 0
+
+				}
+			}
+			if width > 0 {
+				rectanglesByColor[col] = append(rectanglesByColor[col], Rect{
+					x: posX,
+					y: y,
+					w: width,
+					h: 1,
+				})
+			}
+		}
+	}
+}
+
+var cachedRects = make(map[int]*ebiten.Image)
+
+func getRectImageByWidth(width int) *ebiten.Image {
+	if rect, ok := cachedRects[width]; ok {
+		return rect
+	}
+	rect := ebiten.NewImage(width*cellSize, cellSize)
+	cachedRects[width] = rect
+	return rect
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -278,6 +378,26 @@ func (g *Game) setupUI() {
 		}),
 	)
 
+	blackHoleButton := widget.NewButton(
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		widget.ButtonOpts.Image(res.buttonImage),
+		widget.ButtonOpts.Text("Black Hole", res.font, res.textColor),
+		widget.ButtonOpts.TextPadding(res.padding),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			g.selectedCellType = BlackHole
+		}),
+	)
+
+	waterGeneratorButton := widget.NewButton(
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		widget.ButtonOpts.Image(res.buttonImage),
+		widget.ButtonOpts.Text("Water gen", res.font, res.textColor),
+		widget.ButtonOpts.TextPadding(res.padding),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			g.selectedCellType = WaterGenerator
+		}),
+	)
+
 	buttonContainer := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -289,6 +409,8 @@ func (g *Game) setupUI() {
 	buttonContainer.AddChild(waterButton)
 	buttonContainer.AddChild(airButton)
 	buttonContainer.AddChild(metalButton)
+	buttonContainer.AddChild(blackHoleButton)
+	buttonContainer.AddChild(waterGeneratorButton)
 
 	brushButtonContainer := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -351,14 +473,15 @@ func initGrid() [gridSize][gridSize]Cell {
 				grid[y][x] = NewAirCell()
 			}
 		}
+
 	}
 	return grid
 }
 
 func NewSandCell() Cell {
 	colors := []color.Color{
-		color.RGBA{255, 255, 0, 255},
-		color.RGBA{200, 200, 0, 255},
+		//color.RGBA{255, 255, 0, 255},
+		//color.RGBA{200, 200, 0, 255},
 		color.RGBA{150, 150, 0, 255},
 	}
 	return Cell{
@@ -388,9 +511,9 @@ func SandPhysic(x int, y int, g *Game) {
 
 func NewWaterCell() Cell {
 	colors := []color.Color{
-		color.RGBA{0, 0, 255, 255},
+		//color.RGBA{0, 0, 255, 255},
 		color.RGBA{0, 0, 200, 255},
-		color.RGBA{0, 0, 150, 255},
+		//color.RGBA{0, 0, 150, 255},
 	}
 	return Cell{
 		cellType: Water,
@@ -469,7 +592,21 @@ func NewMetalCell() Cell {
 	}
 }
 
-func NoPhysic(x int, y int, g *Game) {
+func NewBlackHoleCell() Cell {
+	return Cell{
+		cellType: BlackHole,
+		color:    color.RGBA{52, 8, 54, 255},
+	}
+}
+
+func NewWaterGeneratorCell() Cell {
+	return Cell{
+		cellType: WaterGenerator,
+		color:    color.RGBA{95, 78, 158, 255},
+	}
+}
+
+func NoPhysic(int, int, *Game) {
 }
 
 func loadFont(size float64) (text.Face, error) {
@@ -492,38 +629,4 @@ func canSwitchCell(origin Cell, target Cell) bool {
 	hasOneLiquid := dataTarget.liquid || dataOrigin.liquid
 	targetDensityIsInferior := dataTarget.density < dataOrigin.density
 	return cellTypeDifferent && (target.cellType == Air || (hasOneLiquid && targetDensityIsInferior))
-}
-
-func hasADifferentNeighbor(x int, y int, cell Cell, g *Game) bool {
-	cellType := cell.cellType
-	rightIsOk := x+1 < gridSize
-	grid := g.grid
-	if rightIsOk && grid[y][x+1].cellType != cellType {
-		return true
-	}
-	leftIsOk := x-1 >= 0
-	if leftIsOk && grid[y][x-1].cellType != cellType {
-		return true
-	}
-	bottomIsOk := y+1 < gridSize
-	if bottomIsOk && grid[y+1][x].cellType != cellType {
-		return true
-	}
-	topIsOk := y-1 >= 0
-	if topIsOk && grid[y-1][x].cellType != cellType {
-		return true
-	}
-	if rightIsOk && bottomIsOk && grid[y+1][x+1].cellType != cellType {
-		return true
-	}
-	if leftIsOk && bottomIsOk && grid[y+1][x-1].cellType != cellType {
-		return true
-	}
-	if rightIsOk && topIsOk && grid[y-1][x+1].cellType != cellType {
-		return true
-	}
-	if leftIsOk && topIsOk && grid[y-1][x-1].cellType != cellType {
-		return true
-	}
-	return false
 }
