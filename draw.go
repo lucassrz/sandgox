@@ -52,14 +52,15 @@ func groupRectanglesHorizontallyByColor(pointsByColor map[color.Color][][]bool) 
 	return rectanglesByColor
 }
 
-var cachedRects = make(map[int]*ebiten.Image)
+var cachedRects = make([]*ebiten.Image, gridSize)
 
 func getRectImageByWidth(width int) *ebiten.Image {
-	if rect, ok := cachedRects[width]; ok {
-		return rect
+	index := width - 1
+	if cachedRects[index] != nil {
+		return cachedRects[index]
 	}
 	rect := ebiten.NewImage(width*cellSize, cellSize)
-	cachedRects[width] = rect
+	cachedRects[index] = rect
 	return rect
 }
 
