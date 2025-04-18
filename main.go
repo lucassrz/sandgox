@@ -37,11 +37,12 @@ var isChangingBrush = false
 var changingBrushTime = 0
 
 type resources struct {
-	buttonImage *widget.ButtonImage
-	font        text.Face
-	textColor   *widget.ButtonTextColor
-	sliderImage *widget.SliderTrackImage
-	padding     widget.Insets
+	buttonImage   *widget.ButtonImage
+	font          text.Face
+	textColor     *widget.ButtonTextColor
+	sliderImage   *widget.SliderTrackImage
+	padding       widget.Insets
+	checkboxImage *widget.CheckboxGraphicImage
 }
 
 func (g *Game) Update() error {
@@ -60,9 +61,15 @@ func benchmarkCheck() {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	createScreenBufferImgIfNotExist()
-	drawCells(g)
+	if onlyShowUpdatedCells {
+		drawCells(g, screen)
+	} else {
+		drawCells(g, screenBufferImg)
+	}
 	op := &ebiten.DrawImageOptions{}
-	screen.DrawImage(screenBufferImg, op)
+	if !onlyShowUpdatedCells {
+		screen.DrawImage(screenBufferImg, op)
+	}
 	drawBrushSize(screen, g)
 	g.ui.Draw(screen)
 	ebiten.SetVsyncEnabled(false)

@@ -7,7 +7,10 @@ import (
 )
 
 var (
-	screenBufferImg *ebiten.Image
+	screenBufferImg      *ebiten.Image
+	onlyShowUpdatedCells = false
+	updateAllCells       = false
+	onlyOneColor         = false
 )
 
 func groupRectanglesHorizontallyByColor(pointsByColor map[color.Color][][]bool) map[color.Color][]Rect {
@@ -64,7 +67,7 @@ func groupUpdatedCellsByColor(g *Game) map[color.Color][][]bool {
 	pointsByColor := make(map[color.Color][][]bool)
 	for y := 0; y < gridSize; y++ {
 		for x := 0; x < gridSize; x++ {
-			if g.grid[y][x].isActive {
+			if g.grid[y][x].isActive || updateAllCells {
 				if pointsByColor[g.grid[y][x].color] == nil {
 					pointsByColor[g.grid[y][x].color] = make([][]bool, gridSize)
 					for i := range pointsByColor[g.grid[y][x].color] {
@@ -95,13 +98,13 @@ func drawBrushSize(screen *ebiten.Image, g *Game) {
 	}
 }
 
-func drawCells(g *Game) {
+func drawCells(g *Game, screen *ebiten.Image) {
 	updatedCellsByColor := groupUpdatedCellsByColor(g)
 	rectanglesByColor := groupRectanglesHorizontallyByColor(updatedCellsByColor)
-	drawRectangles(rectanglesByColor)
+	drawRectangles(rectanglesByColor, screen)
 }
 
-func drawRectangles(rectanglesByColor map[color.Color][]Rect) {
+func drawRectangles(rectanglesByColor map[color.Color][]Rect, screenBufferImg *ebiten.Image) {
 	op := &ebiten.DrawImageOptions{}
 	for col, rects := range rectanglesByColor {
 		for _, rectangle := range rects {

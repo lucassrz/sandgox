@@ -5,6 +5,7 @@ import (
 	"github.com/ebitenui/ebitenui"
 	image2 "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"golang.org/x/image/font/gofont/goregular"
 	"image/color"
@@ -52,6 +53,65 @@ func setupUI(g *Game) {
 		widget.SliderOpts.Direction(widget.DirectionHorizontal),
 	)
 
+	checkboxShowOnlyUpdated := widget.NewCheckbox(
+		widget.CheckboxOpts.ButtonOpts(
+			widget.ButtonOpts.WidgetOpts(
+				// Set the location of the checkboxShowOnlyUpdated
+				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+					HorizontalPosition: widget.AnchorLayoutPositionCenter,
+					VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				}),
+				// Set the minimum size of the checkboxShowOnlyUpdated
+				widget.WidgetOpts.MinSize(30, 30),
+			),
+			// Set the background images - idle, hover, pressed
+			widget.ButtonOpts.Image(res.buttonImage),
+		),
+		widget.CheckboxOpts.Image(res.checkboxImage),
+		widget.CheckboxOpts.StateChangedHandler(func(args *widget.CheckboxChangedEventArgs) {
+			onlyShowUpdatedCells = args.State == widget.WidgetChecked
+		}),
+	)
+
+	checkboxUpdateAllCells := widget.NewCheckbox(
+		widget.CheckboxOpts.ButtonOpts(
+			widget.ButtonOpts.WidgetOpts(
+				// Set the location of the checkboxShowOnlyUpdated
+				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+					HorizontalPosition: widget.AnchorLayoutPositionCenter,
+					VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				}),
+				// Set the minimum size of the checkboxShowOnlyUpdated
+				widget.WidgetOpts.MinSize(30, 30),
+			),
+			// Set the background images - idle, hover, pressed
+			widget.ButtonOpts.Image(res.buttonImage),
+		),
+		widget.CheckboxOpts.Image(res.checkboxImage),
+		widget.CheckboxOpts.StateChangedHandler(func(args *widget.CheckboxChangedEventArgs) {
+			updateAllCells = args.State == widget.WidgetChecked
+		}),
+	)
+	checkboxOnlyOneColor := widget.NewCheckbox(
+		widget.CheckboxOpts.ButtonOpts(
+			widget.ButtonOpts.WidgetOpts(
+				// Set the location of the checkboxShowOnlyUpdated
+				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+					HorizontalPosition: widget.AnchorLayoutPositionCenter,
+					VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				}),
+				// Set the minimum size of the checkboxShowOnlyUpdated
+				widget.WidgetOpts.MinSize(30, 30),
+			),
+			// Set the background images - idle, hover, pressed
+			widget.ButtonOpts.Image(res.buttonImage),
+		),
+		widget.CheckboxOpts.Image(res.checkboxImage),
+		widget.CheckboxOpts.StateChangedHandler(func(args *widget.CheckboxChangedEventArgs) {
+			onlyOneColor = args.State == widget.WidgetChecked
+		}),
+	)
+
 	buttonContainer := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -64,6 +124,9 @@ func setupUI(g *Game) {
 	}
 
 	buttonContainer.AddChild(slider)
+	buttonContainer.AddChild(checkboxShowOnlyUpdated)
+	buttonContainer.AddChild(checkboxUpdateAllCells)
+	buttonContainer.AddChild(checkboxOnlyOneColor)
 
 	brushButtonContainer := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -114,13 +177,31 @@ func newResources() *resources {
 	hover := image2.NewNineSliceColor(color.NRGBA{R: 0x44, G: 0x44, B: 0x44, A: 0xff})
 	pressed := image2.NewNineSliceColor(color.NRGBA{R: 0x22, G: 0x22, B: 0x22, A: 0xff})
 	sliderImage := image2.NewNineSliceColor(color.NRGBA{R: 0x22, G: 0x22, B: 0x22, A: 0xff})
+	uncheckedImage := ebiten.NewImage(20, 20)
+	uncheckedImage.Fill(color.White)
 
+	checkedImage := ebiten.NewImage(20, 20)
+	checkedImage.Fill(color.NRGBA{82, 114, 255, 255})
+
+	greyedImage := ebiten.NewImage(20, 20)
+	greyedImage.Fill(color.NRGBA{255, 0, 0, 255})
 	font, _ := loadFont(10)
 	return &resources{
 		buttonImage: &widget.ButtonImage{
 			Idle:    idle,
 			Hover:   hover,
 			Pressed: pressed,
+		},
+		checkboxImage: &widget.CheckboxGraphicImage{
+			Unchecked: &widget.GraphicImage{
+				Idle: uncheckedImage,
+			},
+			Checked: &widget.GraphicImage{
+				Idle: checkedImage,
+			},
+			Greyed: &widget.GraphicImage{
+				Idle: greyedImage,
+			},
 		},
 		textColor: &widget.ButtonTextColor{
 			Idle: color.NRGBA{R: 0xdf, G: 0xf4, B: 0xff, A: 0xff},

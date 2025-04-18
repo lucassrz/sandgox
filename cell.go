@@ -109,9 +109,13 @@ func NewSandCell() Cell {
 		color.RGBA{200, 200, 0, 255},
 		color.RGBA{150, 150, 0, 255},
 	}
+	index := rand.Intn(len(colors))
+	if onlyOneColor {
+		index = 0
+	}
 	return Cell{
 		cellType: Sand,
-		color:    colors[rand.Intn(len(colors))],
+		color:    colors[index],
 		isActive: true,
 	}
 }
@@ -160,9 +164,13 @@ func NewWaterCell() Cell {
 		color.RGBA{0, 0, 200, 255},
 		color.RGBA{0, 0, 150, 255},
 	}
+	index := rand.Intn(len(colors))
+	if onlyOneColor {
+		index = 0
+	}
 	return Cell{
 		cellType: Water,
-		color:    colors[rand.Intn(len(colors))],
+		color:    colors[index],
 		isActive: true,
 	}
 }
